@@ -186,7 +186,7 @@
 
   <!-- Application Logic JS -->
   <script>
-    // 預設 5 天基礎資料 (沖繩孝親之旅版)
+    // 預設 5 天基礎資料
     const defaultData = [
       {
         day: 1,
@@ -205,7 +205,7 @@
     let tripData = defaultData;
     let mapInstance = null;
 
-    // 安全讀取與初始化資料
+    // 初始化資料
     function initData() {
       try {
         const saved = localStorage.getItem('trip_planner_data');
@@ -226,6 +226,8 @@
       const toast = document.getElementById('toast');
       const toastMsg = document.getElementById('toast-msg');
       const toastIcon = document.getElementById('toast-icon');
+
+      if (!toast || !toastMsg || !toastIcon) return;
 
       toastMsg.innerText = msg;
       toastIcon.className = isSuccess 
@@ -279,4 +281,189 @@
                   <span class="drag-handle text-slate-300 hover:text-slate-500 px-1"><i class="fas fa-grip-vertical"></i></span>
                 </div>
               </div>
-              <h4 class="font-bold text-slate-800
+              <h4 class="font-bold text-slate-800 dark:text-slate-100 text-sm mb-1">${item.title}</h4>
+              ${item.time ? `<div class="text-xs text-slate-500 dark:text-slate-400 mb-1"><i class="far fa-clock mr-1"></i>${item.time}</div>` : ''}
+              ${item.location ? `<div class="text-xs text-slate-500 dark:text-slate-400 mb-1"><i class="fas fa-map-marker-alt mr-1"></i>${item.location}</div>` : ''}
+              ${item.notes ? `<div class="text-xs text-slate-400 dark:text-slate-500 mt-2 bg-slate-50 dark:bg-slate-700/50 p-2 rounded-lg">${item.notes}</div>` : ''}
+            </div>
+          `;
+        }).join('');
+
+        col.innerHTML = `
+          <div class="flex justify-between items-center mb-3 px-1">
+            <h3 class="font-bold text-slate-700 dark:text-slate-200">${dayData.title}</h3>
+            <span class="text-xs font-semibold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-full">${(dayData.items || []).length} 個行程</span>
+          </div>
+          <div id="day-list-${dayIndex}" class="day-activity-list flex-1 space-y-3 min-h-[150px] p-1">
+            ${itemsHTML}
+          </div>
+          <button onclick="openAddModal(${dayIndex})" class="mt-3 w-full py-2 border-2 border-dashed border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-brand-500 hover:text-brand-500 dark:hover:border-brand-400 dark:hover:text-brand-400 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition">
+            <i class="fas fa-plus text-xs"></i> 新增行程
+          </button>
+        `;
+
+        container.appendChild(col);
+      });
+
+      initDragAndDrop();
+    }
+
+    // 拖曳初始化
+    function initDragAndDrop() {
+      tripData.forEach((_, dayIndex) => {
+        const el = document.getElementById(`day-list-${dayIndex}`);
+        if (!el) return;
+        new Sortable(el, {
+          group: 'shared-days',
+          animation: 150,
+          handle: '.drag-handle',
+          ghostClass: 'ghost-card',
+          onEnd: function () {
+            tripData.forEach((d, idx) => {
+              const listEl = document.getElementById(`day-list-${idx}`);
+              if (!listEl) return;
+              const cardEls = Array.from(listEl.querySelectorAll('.activity-card'));
+              const newItems = [];
+              cardEls.forEach(card => {
+                const itemId = card.getAttribute('data-id');
+                let foundItem = null;
+                tripData.forEach(originalDay => {
+                  const match = (originalDay.items || []).find(i => i.id === itemId);
+                  if (match) foundItem = match;
+                });
+                if (foundItem) newItems.push(foundItem);
+              });
+              d.items = newItems;
+            });
+            saveToLocal();
+          }
+        });
+      });
+    }
+
+    // Modal 功能
+    function openAddModal(dayIndex) {
+      document.getElementById('modal-title').innerText = `新增行程 (Day ${dayIndex + 1})`;
+      document.getElementById('activity-form').reset();
+      document.getElementById('form-day-index').value = dayIndex;
+      document.getElementById('form-item-id').value = '';
+      document.getElementById('activity-modal').classList.remove('hidden');
+    }
+
+    function openEditModal(dayIndex, itemId) {
+      const item = tripData[dayIndex].items.find(i => i.id === itemId);
+      if (!item) return;
+
+      document.getElementById('modal-title').innerText = `編輯行程`;
+      document.getElementById('form-day-index').value = dayIndex;
+      document.getElementById('form-item-id').value = itemId;
+      document.getElementById('form-title').value = item.title || '';
+      document.getElementById('form-time').value = item.time || '';
+      document.getElementById('form-category').value = item.category || 'spot';
+      document.getElementById('form-location').value = item.location || '';
+      document.getElementById('form-notes').value = item.notes || '';
+
+      document.getElementById('activity-modal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('activity-modal').classList.add('hidden');
+    }
+
+    function handleFormSubmit(e) {
+      e.preventDefault();
+      const dayIndex = parseInt(document.getElementById('form-day-index').value);
+      const itemId = document.getElementById('form-item-id').value;
+
+      const newItem = {
+        id: itemId || Date.now().toString(),
+        title: document.getElementById('form-title').value,
+        time: document.getElementById('form-time').value,
+        category: document.getElementById('form-category').value,
+        location: document.getElementById('form-location').value,
+        notes: document.getElementById('form-notes').value
+      };
+
+      if (itemId) {
+        const idx = tripData[dayIndex].items.findIndex(i => i.id === itemId);
+        if (idx !== -1) tripData[dayIndex].items[idx] = newItem;
+      } else {
+        if (!tripData[dayIndex].items) tripData[dayIndex].items = [];
+        tripData[dayIndex].items.push(newItem);
+      }
+
+      closeModal();
+      renderBoard();
+      saveToLocal();
+    }
+
+    function deleteItem(dayIndex, itemId) {
+      if (confirm("確定要刪除這個行程嗎？")) {
+        tripData[dayIndex].items = tripData[dayIndex].items.filter(i => i.id !== itemId);
+        renderBoard();
+        saveToLocal();
+      }
+    }
+
+    // 地圖開啟/關閉
+    function toggleMapModal() {
+      const modal = document.getElementById('map-modal');
+      if (!modal) return;
+      modal.classList.toggle('hidden');
+
+      if (!modal.classList.contains('hidden') && !mapInstance) {
+        setTimeout(() => {
+          mapInstance = L.map('map').setView([26.2124, 127.6809], 11);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+          }).addTo(mapInstance);
+        }, 200);
+      }
+    }
+
+    function toggleDarkMode() {
+      document.documentElement.classList.toggle('dark');
+    }
+
+    function exportJSON() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(tripData, null, 2));
+      const anchor = document.createElement('a');
+      anchor.setAttribute("href", dataStr);
+      anchor.setAttribute("download", "2026_okinawa_trip.json");
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+    }
+
+    function importJSON() {
+      document.getElementById('importFile').click();
+    }
+
+    function handleFileImport(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        try {
+          const importedData = JSON.parse(evt.target.result);
+          if (Array.isArray(importedData)) {
+            tripData = importedData;
+            renderBoard();
+            saveToLocal();
+            showToast("成功匯入行程檔案！");
+          }
+        } catch(err) {
+          showToast("無效的 JSON 檔案格式", false);
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // 頁面載入後執行
+    window.onload = function() {
+      initData();
+      renderBoard();
+    };
+  </script>
+</body>
+</html>
