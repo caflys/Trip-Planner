@@ -9,7 +9,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <!-- SortableJS for Smooth Drag and Drop -->
+  <!-- SortableJS for Drag and Drop -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
   <!-- Leaflet CSS & JS for Route Map -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -45,7 +45,6 @@
     .drag-handle:active {
       cursor: grabbing;
     }
-    /* Custom Scrollbar for Kanban Board */
     .kanban-container::-webkit-scrollbar {
       height: 8px;
     }
@@ -71,15 +70,11 @@
   <header class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-30 shadow-sm">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <!-- 四人出遊 Logo -->
-        <div class="bg-brand-500 text-white p-2.5 rounded-xl shadow-md flex items-center justify-center">
-          <i class="fas fa-people-group text-xl"></i>
-        </div>
         <div>
           <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-brand-600 to-indigo-600 bg-clip-text text-transparent">
             2026沖繩孝親之旅
           </h1>
-          <p class="text-xs text-slate-500 dark:text-slate-400">2026 Okinawa Family Trip</p>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Okinawa Family Trip 2026</p>
         </div>
       </div>
 
@@ -136,4 +131,152 @@
 
         <div>
           <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">行程名稱</label>
-          <input type="text"
+          <input type="text" id="form-title" required placeholder="例如：首里城公園" class="w-full px-3 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 focus:ring-2 focus:ring-brand-500 outline-none">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">時間</label>
+            <input type="text" id="form-time" placeholder="09:00 - 10:30" class="w-full px-3 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 focus:ring-2 focus:ring-brand-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">類別</label>
+            <select id="form-category" class="w-full px-3 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 focus:ring-2 focus:ring-brand-500 outline-none">
+              <option value="spot">📍 景點</option>
+              <option value="food">🍱 美食</option>
+              <option value="stay">🏨 住宿</option>
+              <option value="transport">🚗 交通</option>
+              <option value="shopping">🛍️ 購物</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">地點 / 地址</label>
+          <input type="text" id="form-location" placeholder="輸入地點名稱或地址" class="w-full px-3 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 focus:ring-2 focus:ring-brand-500 outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">備註說明</label>
+          <textarea id="form-notes" rows="2" placeholder="注意事項、門票、接駁等..." class="w-full px-3 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 focus:ring-2 focus:ring-brand-500 outline-none"></textarea>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeModal()" class="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-sm font-medium">取消</button>
+          <button type="submit" class="px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-sm font-medium shadow-md">保存行程</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Route Map Modal -->
+  <div id="map-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-4xl w-full h-[80vh] p-4 flex flex-col shadow-2xl">
+      <div class="flex justify-between items-center mb-3 px-2">
+        <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+          <i class="fas fa-map-marked-alt text-brand-500"></i> 行程動態地圖
+        </h3>
+        <button onclick="toggleMapModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+          <i class="fas fa-times text-lg"></i>
+        </button>
+      </div>
+      <div id="map" class="flex-1 rounded-xl border border-slate-200 dark:border-slate-700 z-10"></div>
+    </div>
+  </div>
+
+  <!-- Application Logic JS -->
+  <script>
+    // 預設 5 天基礎資料 (沖繩孝親之旅版)
+    const defaultData = [
+      {
+        day: 1,
+        title: "Day 1 - 抵達與探索",
+        items: [
+          { id: '1', time: '10:00 - 12:00', title: '抵達那霸機場與取車', category: 'transport', location: '那霸機場', notes: '領取租車與 SIM 卡/WiFi' },
+          { id: '2', time: '12:30 - 14:00', title: '國際通散策與午餐', category: 'food', location: '國際通', notes: '品嚐沖繩在地美食，節奏放慢適合長輩' }
+        ]
+      },
+      { day: 2, title: "Day 2 - 景點古蹟巡禮", items: [] },
+      { day: 3, title: "Day 3 - 中北部海景體驗", items: [] },
+      { day: 4, title: "Day 4 - 悠閒購物與美食", items: [] },
+      { day: 5, title: "Day 5 - 伴手禮與搭機", items: [] }
+    ];
+
+    let tripData = defaultData;
+    let mapInstance = null;
+
+    // 安全讀取與初始化資料
+    function initData() {
+      try {
+        const saved = localStorage.getItem('trip_planner_data');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length === 5) {
+            tripData = parsed;
+          }
+        }
+      } catch (e) {
+        console.warn("快取資料格式不符，重置為預設行程", e);
+        tripData = defaultData;
+      }
+    }
+
+    // 提示訊息
+    function showToast(msg, isSuccess = true) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toast-msg');
+      const toastIcon = document.getElementById('toast-icon');
+
+      toastMsg.innerText = msg;
+      toastIcon.className = isSuccess 
+        ? "fas fa-check-circle text-emerald-400 text-xl" 
+        : "fas fa-exclamation-circle text-rose-400 text-xl";
+
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 2500);
+    }
+
+    // 儲存至瀏覽器
+    function saveToLocal() {
+      try {
+        localStorage.setItem('trip_planner_data', JSON.stringify(tripData));
+        showToast("行程已成功儲存！");
+      } catch (e) {
+        showToast("儲存失敗", false);
+      }
+    }
+
+    // 標籤樣式
+    const categoryConfig = {
+      spot: { name: '景點', bg: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' },
+      food: { name: '美食', bg: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' },
+      stay: { name: '住宿', bg: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300' },
+      transport: { name: '交通', bg: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
+      shopping: { name: '購物', bg: 'bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-300' }
+    };
+
+    // 渲染 5 天看板
+    function renderBoard() {
+      const container = document.getElementById('board-container');
+      if (!container) return;
+      container.innerHTML = '';
+
+      tripData.forEach((dayData, dayIndex) => {
+        const col = document.createElement('div');
+        col.className = "flex-1 min-w-[280px] max-w-[320px] bg-slate-100 dark:bg-slate-800/60 rounded-2xl p-4 flex flex-col border border-slate-200/80 dark:border-slate-700/60 shadow-sm";
+        
+        let itemsHTML = (dayData.items || []).map(item => {
+          const cat = categoryConfig[item.category] || categoryConfig.spot;
+          return `
+            <div data-id="${item.id}" class="activity-card bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-md transition group relative">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-semibold px-2 py-0.5 rounded-full ${cat.bg}">${cat.name}</span>
+                <div class="flex items-center gap-1 opacity-80 group-hover:opacity-100">
+                  <button onclick="openEditModal(${dayIndex}, '${item.id}')" class="text-slate-400 hover:text-brand-500 p-1"><i class="fas fa-pen text-xs"></i></button>
+                  <button onclick="deleteItem(${dayIndex}, '${item.id}')" class="text-slate-400 hover:text-rose-500 p-1"><i class="fas fa-trash text-xs"></i></button>
+                  <span class="drag-handle text-slate-300 hover:text-slate-500 px-1"><i class="fas fa-grip-vertical"></i></span>
+                </div>
+              </div>
+              <h4 class="font-bold text-slate-800
